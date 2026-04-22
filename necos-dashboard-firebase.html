@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NecoS | Fundbüro – Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Exo+2:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!--
+╔══════════════════════════════════════════════════════════════════╗
+║         NECOS FUNDBÜRO DASHBOARD – FIREBASE SETUP GUIDE         ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  SCHRITT 1 – FIREBASE PROJEKT ERSTELLEN (kostenlos)             ║
+║  ─────────────────────────────────────────────────────────────  ║
+║  1. Gehe zu: https://console.firebase.google.com                 ║
+║  2. Klick "Projekt hinzufügen" → Name: necos-fundburo            ║
+║  3. Google Analytics: kann deaktiviert werden                    ║
+║  4. "Projekt erstellen" klicken                                  ║
+║                                                                  ║
+║  SCHRITT 2 – FIRESTORE DATENBANK                                 ║
+║  ─────────────────────────────────────────────────────────────  ║
+║  1. Links im Menü: "Firestore Database" klicken                  ║
+║  2. "Datenbank erstellen" → "Im Testmodus starten" wählen        ║
+║     (gibt dir 30 Tage open access, danach Regeln anpassen)       ║
+║  3. Standort: eur3 (Europe) wählen → Fertig                      ║
+║                                                                  ║
+║  SCHRITT 3 – WEB-APP KONFIGURATION                               ║
+║  ─────────────────────────────────────────────────────────────  ║
+║  1. Projektübersicht → </> Web-Symbol klicken                    ║
+║  2. App-Name: "necos-dashboard" → Registrieren                   ║
+║  3. Du bekommst ein firebaseConfig Objekt, z.B.:                 ║
+║     const firebaseConfig = {                                     ║
+║       apiKey: "AIza...",                                         ║
+║       authDomain: "...",                                         ║
+║       projectId: "...",                                          ║
+║       ...                                                        ║
+║     }                                                            ║
+║  4. ERSETZE den FIREBASE_CONFIG Block weiter unten im Code!      ║
+║                                                                  ║
+║  SCHRITT 4 – AUF GITHUB PAGES HOSTEN                             ║
+║  ─────────────────────────────────────────────────────────────  ║
+║  1. github.com → New Repository: necos-dashboard (Public)        ║
+║  2. Diese Datei umbenennen zu: index.html                        ║
+║  3. Datei hochladen → Settings → Pages → Branch: main → Save     ║
+║  4. Link teilen: https://DEINNAME.github.io/necos-dashboard      ║
+║                                                                  ║
+║  SCHRITT 5 – FIRESTORE SICHERHEITSREGELN (nach 30 Tagen)        ║
+║  ─────────────────────────────────────────────────────────────  ║
+║  Firebase Console → Firestore → Regeln → einfügen:              ║
+║                                                                  ║
+║  rules_version = '2';                                            ║
+║  service cloud.firestore {                                       ║
+║    match /databases/{database}/documents {                       ║
+║      match /{document=**} {                                      ║
+║        allow read: if true;                                      ║
+║        allow write: if true; // Oder IP/Auth beschränken         ║
+║      }                                                           ║
+║    }                                                             ║
+║  }                                                               ║
+╚══════════════════════════════════════════════════════════════════╝
+-->
+
+<style>
+  :root {
+    --bg: #0a0b0f; --surface: #111318; --surface2: #181b22; --surface3: #1f2330;
+    --border: #2a2f3f; --accent: #5865F2; --accent2: #7289da;
+    --gold: #ffd700; --green: #43b581; --red: #f04747; --orange: #faa61a;
+    --text: #e8eaf2; --text2: #8b91a8; --text3: #555c72;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; }
+  body { font-family:'Exo 2',sans-serif; background:var(--bg); color:var(--text); display:flex; min-height:100vh; overflow-x:hidden; }
+
+  /* ── SETUP BANNER ── */
+  #setup-banner {
+    position:fixed; top:0; left:0; right:0; z-index:999;
+    background:linear-gradient(90deg,rgba(250,166,26,0.15),rgba(88,101,242,0.15));
+    border-bottom:2px solid var(--orange);
+    padding:10px 24px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  #setup-banner .sb-icon { font-size:20px; }
+  #setup-banner .sb-text { flex:1; font-size:13px; color:var(--orange); font-weight:600; }
+  #setup-banner .sb-text span { color:var(--text2); font-weight:400; }
+  #setup-banner .sb-close { background:none; border:1px solid var(--orange); color:var(--orange); padding:4px 12px; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
+  #setup-banner .sb-close:hover { background:var(--orange); color:#000; }
+
+  /* ── LOADING ── */
+  #loading-screen {
+    position:fixed; inset:0; background:var(--bg); z-index:500;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+  }
+  .spinner {
+    width:40px; height:40px; border:3px solid var(--border);
+    border-top-color:var(--accent); border-radius:50%; animation:spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  #loading-screen p { color:var(--text2); font-size:14px; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width:240px; min-height:100vh; background:var(--surface); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; position:fixed; top:0; left:0; z-index:100; padding-bottom:20px;
+  }
+  .sidebar-logo { padding:24px 20px 20px; border-bottom:1px solid var(--border); }
+  .sidebar-logo .server-name { font-family:'Rajdhani',sans-serif; font-size:17px; font-weight:700; color:var(--accent2); letter-spacing:0.04em; line-height:1.2; }
+  .sidebar-logo .server-sub { font-size:11px; color:var(--text3); margin-top:2px; letter-spacing:0.08em; text-transform:uppercase; }
+  .online-badge { display:inline-flex; align-items:center; gap:5px; background:rgba(67,181,129,0.1); border:1px solid rgba(67,181,129,0.25); border-radius:20px; padding:2px 9px; font-size:11px; color:var(--green); margin-top:8px; }
+  .online-badge::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--green); }
+  .sync-badge { display:inline-flex; align-items:center; gap:5px; background:rgba(88,101,242,0.1); border:1px solid rgba(88,101,242,0.25); border-radius:20px; padding:2px 9px; font-size:10px; color:var(--accent2); margin-top:4px; }
+  .nav-section { padding:16px 12px 4px; font-size:10px; color:var(--text3); letter-spacing:0.12em; text-transform:uppercase; font-weight:600; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; margin:1px 8px; border-radius:8px; cursor:pointer; color:var(--text2); font-size:14px; font-weight:500; transition:all 0.18s; }
+  .nav-item:hover { background:var(--surface2); color:var(--text); }
+  .nav-item.active { background:rgba(88,101,242,0.15); color:var(--accent2); border-left:3px solid var(--accent); margin-left:8px; padding-left:13px; }
+  .nav-item .icon { font-size:16px; min-width:18px; text-align:center; }
+  .nav-badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 6px; border-radius:20px; min-width:18px; text-align:center; }
+  .nav-badge.green { background:var(--green); }
+  .nav-badge.orange { background:var(--orange); }
+  .sidebar-footer { margin-top:auto; padding:16px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+  .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--accent),#9b59b6); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; color:#fff; flex-shrink:0; }
+  .user-info .name { font-size:13px; font-weight:600; }
+  .user-info .role { font-size:11px; color:var(--gold); }
+
+  /* ── MAIN ── */
+  .main { margin-left:240px; flex:1; display:flex; flex-direction:column; min-height:100vh; }
+  .topbar { padding:18px 32px; border-bottom:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:50; }
+  .topbar-title { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; letter-spacing:0.03em; display:flex; align-items:center; gap:10px; }
+  .live-dot { width:8px; height:8px; border-radius:50%; background:var(--green); animation:pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+  .topbar-actions { display:flex; gap:10px; }
+  .btn { padding:8px 18px; border-radius:8px; border:none; cursor:pointer; font-family:'Exo 2',sans-serif; font-size:13px; font-weight:600; transition:all 0.18s; display:inline-flex; align-items:center; gap:6px; }
+  .btn-primary { background:var(--accent); color:#fff; }
+  .btn-primary:hover { background:#4752c4; box-shadow:0 0 16px rgba(88,101,242,0.4); }
+  .btn-secondary { background:var(--surface3); color:var(--text); border:1px solid var(--border); }
+  .btn-secondary:hover { background:var(--border); }
+  .btn-danger { background:rgba(240,71,71,0.15); color:var(--red); border:1px solid rgba(240,71,71,0.3); }
+  .btn-danger:hover { background:rgba(240,71,71,0.25); }
+  .btn-success { background:rgba(67,181,129,0.15); color:var(--green); border:1px solid rgba(67,181,129,0.3); }
+  .btn-success:hover { background:rgba(67,181,129,0.25); }
+  .btn-sm { padding:5px 12px; font-size:12px; }
+  .btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+  /* ── CONTENT ── */
+  .content { padding:28px 32px; flex:1; }
+  .page { display:none; }
+  .page.active { display:block; animation:fadeIn 0.25s ease; }
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+  /* ── STATS ── */
+  .stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:28px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; position:relative; overflow:hidden; transition:border-color 0.2s; }
+  .stat-card:hover { border-color:var(--accent2); }
+  .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+  .stat-card.blue::before { background:var(--accent); }
+  .stat-card.green::before { background:var(--green); }
+  .stat-card.red::before { background:var(--red); }
+  .stat-card.gold::before { background:var(--gold); }
+  .stat-label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.1em; margin-bottom:8px; }
+  .stat-value { font-family:'Rajdhani',sans-serif; font-size:36px; font-weight:700; line-height:1; }
+  .stat-value.blue{color:var(--accent2)} .stat-value.green{color:var(--green)} .stat-value.red{color:var(--red)} .stat-value.gold{color:var(--gold)}
+  .stat-sub { font-size:12px; color:var(--text3); margin-top:6px; }
+
+  /* ── GRID ── */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .grid-3 { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+
+  /* ── CARD ── */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+  .card-header { padding:16px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .card-title { font-family:'Rajdhani',sans-serif; font-size:16px; font-weight:700; letter-spacing:0.03em; display:flex; align-items:center; gap:8px; }
+  .card-body { padding:20px; }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; padding:10px 14px; font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:0.1em; border-bottom:1px solid var(--border); font-weight:600; }
+  td { padding:12px 14px; font-size:13px; border-bottom:1px solid rgba(42,47,63,0.5); vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(88,101,242,0.04); }
+
+  /* ── TAGS ── */
+  .tag { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
+  .tag-blue{background:rgba(88,101,242,0.15);color:var(--accent2);border:1px solid rgba(88,101,242,0.3)}
+  .tag-green{background:rgba(67,181,129,0.13);color:var(--green);border:1px solid rgba(67,181,129,0.25)}
+  .tag-red{background:rgba(240,71,71,0.13);color:var(--red);border:1px solid rgba(240,71,71,0.25)}
+  .tag-orange{background:rgba(250,166,26,0.13);color:var(--orange);border:1px solid rgba(250,166,26,0.25)}
+  .tag-gold{background:rgba(255,215,0,0.1);color:var(--gold);border:1px solid rgba(255,215,0,0.25)}
+
+  /* ── MODAL ── */
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); z-index:200; display:none; align-items:center; justify-content:center; }
+  .modal-overlay.open { display:flex; animation:fadeIn 0.18s ease; }
+  .modal { background:var(--surface2); border:1px solid var(--border); border-radius:16px; width:520px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 25px 60px rgba(0,0,0,0.5); }
+  .modal-header { padding:20px 24px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .modal-title { font-family:'Rajdhani',sans-serif; font-size:18px; font-weight:700; }
+  .modal-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:20px; line-height:1; transition:color 0.15s; }
+  .modal-close:hover { color:var(--text); }
+  .modal-body { padding:20px 24px; }
+  .modal-footer { padding:16px 24px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:flex-end; }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom:16px; }
+  .form-label { display:block; font-size:12px; color:var(--text2); margin-bottom:6px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; }
+  .form-control { width:100%; padding:10px 14px; background:var(--surface3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'Exo 2',sans-serif; font-size:14px; transition:border-color 0.18s; outline:none; }
+  .form-control:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(88,101,242,0.15); }
+  .form-control option { background:var(--surface3); }
+  .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  /* ── CALENDAR ── */
+  .calendar { padding:8px; }
+  .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .cal-header span { font-family:'Rajdhani',sans-serif; font-weight:700; font-size:16px; }
+  .cal-header button { background:none; border:none; color:var(--text2); cursor:pointer; font-size:16px; padding:4px 8px; border-radius:6px; transition:background 0.15s; }
+  .cal-header button:hover { background:var(--surface3); }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+  .cal-dayname { text-align:center; font-size:11px; color:var(--text3); padding:4px; text-transform:uppercase; font-weight:600; }
+  .cal-day { text-align:center; padding:6px 4px; border-radius:6px; cursor:pointer; font-size:13px; font-weight:500; transition:all 0.15s; position:relative; }
+  .cal-day:hover { background:var(--surface3); }
+  .cal-day.today { background:rgba(88,101,242,0.2); color:var(--accent2); font-weight:700; }
+  .cal-day.has-event::after { content:''; position:absolute; bottom:2px; left:50%; transform:translateX(-50%); width:4px; height:4px; border-radius:50%; background:var(--accent); }
+  .cal-day.empty { cursor:default; }
+
+  /* ── EVENT ITEMS ── */
+  .event-item { display:flex; align-items:flex-start; gap:12px; padding:12px; border-radius:8px; background:var(--surface3); border:1px solid var(--border); margin-bottom:10px; transition:border-color 0.18s; }
+  .event-item:hover { border-color:var(--accent2); }
+  .event-date-box { background:rgba(88,101,242,0.15); border:1px solid rgba(88,101,242,0.3); border-radius:8px; padding:6px 10px; text-align:center; min-width:48px; flex-shrink:0; }
+  .event-date-box .day { font-family:'Rajdhani',sans-serif; font-size:22px; font-weight:700; color:var(--accent2); line-height:1; }
+  .event-date-box .month { font-size:10px; color:var(--text3); text-transform:uppercase; }
+  .event-info { flex:1; }
+  .event-title { font-weight:600; font-size:14px; margin-bottom:3px; }
+  .event-meta { font-size:12px; color:var(--text2); display:flex; gap:12px; flex-wrap:wrap; }
+  .event-actions { display:flex; gap:6px; align-items:center; }
+
+  /* ── ACTIVITY ── */
+  .activity-item { display:flex; gap:12px; padding:10px 0; border-bottom:1px solid rgba(42,47,63,0.5); align-items:flex-start; }
+  .activity-item:last-child { border-bottom:none; }
+  .activity-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+  .activity-text { font-size:13px; line-height:1.5; }
+  .activity-text strong { color:var(--accent2); }
+  .activity-time { font-size:11px; color:var(--text3); margin-top:2px; }
+
+  /* ── LOST ITEMS ── */
+  .lost-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+  .lost-card { background:var(--surface3); border:1px solid var(--border); border-radius:10px; padding:14px; transition:all 0.18s; }
+  .lost-card:hover { border-color:var(--accent2); transform:translateY(-2px); box-shadow:0 8px 24px rgba(0,0,0,0.25); }
+  .lost-card .item-icon { font-size:28px; margin-bottom:8px; }
+  .lost-card .item-name { font-weight:600; font-size:14px; margin-bottom:4px; }
+  .lost-card .item-meta { font-size:11px; color:var(--text2); }
+  .lost-card .item-status { margin-top:10px; }
+
+  /* ── MEMBERS ── */
+  .member-item { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid rgba(42,47,63,0.5); }
+  .member-item:last-child { border-bottom:none; }
+  .member-avatar { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:14px; flex-shrink:0; }
+  .member-info { flex:1; }
+  .member-name { font-size:14px; font-weight:600; }
+  .member-roles { font-size:11px; color:var(--text3); margin-top:2px; }
+  .member-actions { display:flex; gap:6px; }
+
+  /* ── TABS ── */
+  .tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); }
+  .tab { padding:9px 18px; font-size:13px; font-weight:600; cursor:pointer; color:var(--text2); border-bottom:2px solid transparent; margin-bottom:-1px; transition:all 0.18s; border-radius:6px 6px 0 0; }
+  .tab:hover { color:var(--text); background:rgba(88,101,242,0.07); }
+  .tab.active { color:var(--accent2); border-bottom-color:var(--accent); }
+  .tab-content { display:none; }
+  .tab-content.active { display:block; animation:fadeIn 0.2s; }
+
+  /* ── MISC ── */
+  .filter-bar { display:flex; gap:10px; margin-bottom:20px; align-items:center; flex-wrap:wrap; }
+  .search-wrap { position:relative; flex:1; min-width:180px; }
+  .search-input { width:100%; padding:9px 14px 9px 36px; background:var(--surface3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'Exo 2',sans-serif; font-size:13px; outline:none; transition:border-color 0.18s; }
+  .search-input:focus { border-color:var(--accent); }
+  .search-wrap::before { content:'🔍'; position:absolute; left:11px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none; }
+  .page-header { margin-bottom:24px; }
+  .page-header h1 { font-family:'Rajdhani',sans-serif; font-size:26px; font-weight:700; margin-bottom:4px; }
+  .page-header p { color:var(--text2); font-size:14px; }
+  .empty-state { text-align:center; padding:40px 20px; color:var(--text3); }
+  .empty-state .icon { font-size:40px; margin-bottom:12px; }
+  .empty-state p { font-size:14px; }
+  .announcement { background:linear-gradient(135deg,rgba(88,101,242,0.12),rgba(155,89,182,0.08)); border:1px solid rgba(88,101,242,0.25); border-radius:12px; padding:16px 20px; margin-bottom:16px; position:relative; overflow:hidden; }
+  .announcement::before { content:''; position:absolute; top:0; left:0; width:4px; height:100%; background:var(--accent); }
+  .announcement .ann-title { font-weight:700; font-size:14px; margin-bottom:4px; color:var(--accent2); }
+  .announcement .ann-text { font-size:13px; color:var(--text2); }
+  .announcement .ann-meta { font-size:11px; color:var(--text3); margin-top:8px; }
+  .warn-bar { display:flex; gap:3px; }
+  .warn-dot { width:10px; height:10px; border-radius:2px; background:var(--surface3); border:1px solid var(--border); }
+  .warn-dot.active { background:var(--orange); border-color:var(--orange); }
+  .warn-dot.red { background:var(--red); border-color:var(--red); }
+  .info-box { border-radius:8px; padding:12px 16px; font-size:13px; margin-bottom:16px; display:flex; gap:10px; align-items:flex-start; }
+  .info-box.orange { background:rgba(250,166,26,0.1); border:1px solid rgba(250,166,26,0.25); color:var(--orange); }
+  .info-box.blue { background:rgba(88,101,242,0.1); border:1px solid rgba(88,101,242,0.25); color:var(--accent2); }
+  ::-webkit-scrollbar { width:6px; height:6px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+
+  /* ── TOAST ── */
+  #toast { position:fixed; bottom:24px; right:24px; z-index:999; display:flex; flex-direction:column; gap:8px; }
+  .toast-item { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 18px; font-size:13px; min-width:220px; animation:slideIn 0.3s ease; box-shadow:0 8px 24px rgba(0,0,0,0.4); display:flex; align-items:center; gap:10px; }
+  @keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:none} }
+  .toast-item.success { border-left:3px solid var(--green); }
+  .toast-item.error { border-left:3px solid var(--red); }
+  .toast-item.info { border-left:3px solid var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- SETUP BANNER -->
+<div id="setup-banner">
+  <span class="sb-icon">⚠️</span>
+  <div class="sb-text">
+    Firebase nicht konfiguriert – Dashboard läuft im <strong>Offline-Demo-Modus</strong>.
+    <span>Ersetze die FIREBASE_CONFIG im &lt;script&gt; Tag mit deinen Werten.</span>
+  </div>
+  <button class="sb-close" onclick="this.parentElement.style.display='none'">Verstanden</button>
+</div>
+
+<!-- LOADING -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p id="loading-text">Verbinde mit Firebase...</p>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" style="margin-top:48px;">
+  <div class="sidebar-logo">
+    <div class="server-name">NecoS | Fundbüro</div>
+    <div class="server-sub">Server Dashboard</div>
+    <div class="online-badge">Online</div>
+    <div class="sync-badge" id="sync-status">🔴 Offline-Modus</div>
+  </div>
+  <div class="nav-section">Übersicht</div>
+  <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="icon">🏠</span> Dashboard</div>
+  <div class="nav-item" onclick="showPage('termine',this)"><span class="icon">📅</span> Termine <span class="nav-badge green" id="badge-termine">0</span></div>
+  <div class="nav-item" onclick="showPage('fundbüro',this)"><span class="icon">🔍</span> Fundbüro <span class="nav-badge orange" id="badge-fund">0</span></div>
+  <div class="nav-section">Moderation</div>
+  <div class="nav-item" onclick="showPage('bans',this)"><span class="icon">🔨</span> Bans <span class="nav-badge" id="badge-bans">0</span></div>
+  <div class="nav-item" onclick="showPage('verwarnungen',this)"><span class="icon">⚠️</span> Verwarnungen</div>
+  <div class="nav-item" onclick="showPage('mitglieder',this)"><span class="icon">👥</span> Mitglieder</div>
+  <div class="nav-section">Server</div>
+  <div class="nav-item" onclick="showPage('ankuendigungen',this)"><span class="icon">📢</span> Ankündigungen</div>
+  <div class="nav-item" onclick="showPage('tickets',this)"><span class="icon">🎫</span> Tickets <span class="nav-badge" id="badge-tickets">0</span></div>
+  <div class="nav-item" onclick="showPage('einstellungen',this)"><span class="icon">⚙️</span> Einstellungen</div>
+  <div class="sidebar-footer">
+    <div class="avatar" id="sidebar-avatar">N</div>
+    <div class="user-info">
+      <div class="name" id="sidebar-name">NecoS</div>
+      <div class="role">⭐ Admin</div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main" style="margin-top:48px;">
+  <div class="topbar">
+    <div class="topbar-title">
+      <span id="topbar-title">🏠 Dashboard</span>
+      <div class="live-dot" id="live-dot" style="opacity:0;" title="Live-Sync aktiv"></div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-secondary btn-sm" onclick="showPage('tickets',null)">🎫 Tickets (<span id="ticket-count">0</span>)</button>
+      <button class="btn btn-primary btn-sm" onclick="openModal('modal-schnell')">+ Schnellaktion</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card blue"><div class="stat-label">Mitglieder</div><div class="stat-value blue" id="stat-members">—</div><div class="stat-sub">Eingetragen</div></div>
+        <div class="stat-card green"><div class="stat-label">Termine</div><div class="stat-value green" id="stat-termine">—</div><div class="stat-sub">Anstehend</div></div>
+        <div class="stat-card red"><div class="stat-label">Aktive Bans</div><div class="stat-value red" id="stat-bans">—</div><div class="stat-sub">Gesperrt</div></div>
+        <div class="stat-card gold"><div class="stat-label">Fund-Einträge</div><div class="stat-value gold" id="stat-fund">—</div><div class="stat-sub">Offen</div></div>
+      </div>
+      <div class="grid-3">
+        <div>
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+              <div class="card-title">📅 Nächste Termine</div>
+              <button class="btn btn-primary btn-sm" onclick="openModal('modal-termin')">+ Neu</button>
+            </div>
+            <div class="card-body" id="dash-termine"><div class="empty-state"><div class="icon">📅</div><p>Wird geladen...</p></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">⚡ Letzte Aktivität</div></div>
+            <div class="card-body" id="dash-activity"><div class="empty-state"><div class="icon">⚡</div><p>Wird geladen...</p></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:20px;">
+            <div class="card-header"><div class="card-title">🎫 Offene Tickets</div></div>
+            <div class="card-body" id="dash-tickets"><div class="empty-state"><p>Keine Tickets</p></div></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><div class="card-title">🔍 Fundbüro (Offen)</div></div>
+            <div class="card-body" id="dash-fund"><div class="empty-state"><p>Keine offenen Funde</p></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TERMINE -->
+    <div class="page" id="page-termine">
+      <div class="page-header"><h1>📅 Terminverwaltung</h1><p>Events, Meetings und Veranstaltungen</p></div>
+      <div class="grid-2" style="margin-bottom:20px;">
+        <div class="card">
+          <div class="card-header"><div class="card-title">📆 Kalender</div><button class="btn btn-primary btn-sm" onclick="openModal('modal-termin')">+ Erstellen</button></div>
+          <div class="card-body"><div class="calendar" id="calendar"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📋 Alle Termine</div></div>
+          <div class="card-body" id="termine-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FUNDBÜRO -->
+    <div class="page" id="page-fundbüro">
+      <div class="page-header"><h1>🔍 Fundbüro</h1><p>Gefundene und vermisste Gegenstände</p></div>
+      <div class="filter-bar">
+        <div class="search-wrap"><input class="search-input" type="text" placeholder="Suche nach Gegenstand..." oninput="filterFund(this.value)"></div>
+        <select class="form-control" style="width:160px;" onchange="filterFundStatus(this.value)">
+          <option value="">Alle Status</option><option value="offen">Offen</option><option value="gefunden">Gefunden</option><option value="abgeholt">Abgeholt</option>
+        </select>
+        <button class="btn btn-primary" onclick="openModal('modal-fund')">+ Eintrag hinzufügen</button>
+      </div>
+      <div class="lost-grid" id="fund-grid"></div>
+    </div>
+
+    <!-- BANS -->
+    <div class="page" id="page-bans">
+      <div class="page-header"><h1>🔨 Bans & Sperren</h1><p>Alle gesperrten Nutzer</p></div>
+      <div class="filter-bar">
+        <div class="search-wrap"><input class="search-input" type="text" placeholder="Nutzer suchen..." oninput="filterBans(this.value)"></div>
+        <button class="btn btn-danger" onclick="openModal('modal-ban')">🔨 Ban eintragen</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr><th>Nutzer</th><th>Moderator</th><th>Grund</th><th>Datum</th><th>Dauer</th><th>Status</th><th>Aktionen</th></tr></thead>
+          <tbody id="ban-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- VERWARNUNGEN -->
+    <div class="page" id="page-verwarnungen">
+      <div class="page-header"><h1>⚠️ Verwarnungen</h1><p>Moderationslog und Verwarnungshistorie</p></div>
+      <div class="filter-bar">
+        <div class="search-wrap"><input class="search-input" type="text" placeholder="Nutzer suchen..."></div>
+        <button class="btn btn-secondary" style="border-color:var(--orange);color:var(--orange);" onclick="openModal('modal-warn')">⚠️ Verwarnung</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table><thead><tr><th>Nutzer</th><th>Mod</th><th>Grund</th><th>Level</th><th>Datum</th><th>Aktionen</th></tr></thead>
+          <tbody id="warn-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- MITGLIEDER -->
+    <div class="page" id="page-mitglieder">
+      <div class="page-header"><h1>👥 Mitgliederverwaltung</h1><p>Alle Servermitglieder und ihre Rollen</p></div>
+      <div class="filter-bar">
+        <div class="search-wrap"><input class="search-input" type="text" placeholder="Mitglied suchen..." oninput="filterMembers(this.value)"></div>
+        <button class="btn btn-primary" onclick="openModal('modal-member')">+ Mitglied hinzufügen</button>
+      </div>
+      <div class="card"><div class="card-body" id="member-list"></div></div>
+    </div>
+
+    <!-- ANKÜNDIGUNGEN -->
+    <div class="page" id="page-ankuendigungen">
+      <div class="page-header"><h1>📢 Ankündigungen</h1><p>Server-Nachrichten und wichtige Hinweise</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="openModal('modal-ann')">📢 Neue Ankündigung</button>
+      </div>
+      <div id="ann-list"></div>
+    </div>
+
+    <!-- TICKETS -->
+    <div class="page" id="page-tickets">
+      <div class="page-header"><h1>🎫 Support-Tickets</h1><p>Offene und bearbeitete Mitgliederanfragen</p></div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:16px;">
+        <button class="btn btn-primary" onclick="openModal('modal-ticket')">🎫 Ticket erstellen</button>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('tab-offen',this)">Offen (<span id="tab-offen-count">0</span>)</div>
+        <div class="tab" onclick="switchTab('tab-bearbeitung',this)">In Bearbeitung</div>
+        <div class="tab" onclick="switchTab('tab-geschlossen',this)">Geschlossen</div>
+      </div>
+      <div class="tab-content active" id="tab-offen">
+        <div class="card"><div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Nutzer</th><th>Betreff</th><th>Kategorie</th><th>Erstellt</th><th>Aktionen</th></tr></thead>
+          <tbody id="ticket-body-offen"></tbody>
+        </table></div></div>
+      </div>
+      <div class="tab-content" id="tab-bearbeitung"><div class="empty-state"><div class="icon">⏳</div><p>Keine Tickets in Bearbeitung</p></div></div>
+      <div class="tab-content" id="tab-geschlossen"><div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>#</th><th>Nutzer</th><th>Betreff</th><th>Geschlossen am</th></tr></thead>
+        <tbody id="ticket-body-closed"></tbody>
+      </table></div></div></div>
+    </div>
+
+    <!-- EINSTELLUNGEN -->
+    <div class="page" id="page-einstellungen">
+      <div class="page-header"><h1>⚙️ Einstellungen</h1><p>Dashboard-Konfiguration</p></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">🔥 Firebase Status</div></div>
+          <div class="card-body">
+            <div class="info-box blue" id="firebase-status-box">🔴 Nicht verbunden – konfiguriere Firebase im Script-Tag</div>
+            <div class="form-group"><label class="form-label">Moderator-Name (wird bei Aktionen verwendet)</label>
+              <input class="form-control" id="setting-modname" value="NecoS" placeholder="Dein Discord-Name">
+            </div>
+            <button class="btn btn-primary" onclick="saveSetting()">💾 Speichern</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">📊 Daten Export</div></div>
+          <div class="card-body">
+            <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Exportiere alle Daten als JSON-Datei (Backup)</p>
+            <button class="btn btn-secondary" onclick="exportData()">⬇️ Alle Daten exportieren</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ============ MODALS ============ -->
+
+<!-- Termin -->
+<div class="modal-overlay" id="modal-termin">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📅 Termin erstellen</div><button class="modal-close" onclick="closeModal('modal-termin')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Titel *</label><input class="form-control" id="t-title" placeholder="z.B. Server-Meeting"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Datum *</label><input class="form-control" id="t-date" type="date"></div>
+        <div class="form-group"><label class="form-label">Uhrzeit</label><input class="form-control" id="t-time" type="time" value="18:00"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Typ</label>
+        <select class="form-control" id="t-type"><option value="event">🎉 Event</option><option value="meeting">💬 Meeting</option><option value="wartung">🔧 Wartung</option><option value="sonstiges">📌 Sonstiges</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Beschreibung</label><textarea class="form-control" id="t-desc" rows="3" placeholder="Details..."></textarea></div>
+      <div class="form-group"><label class="form-label">Veranstalter</label><input class="form-control" id="t-org" placeholder="Discord-Name"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-termin')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addTermin()">✅ Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Fund -->
+<div class="modal-overlay" id="modal-fund">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">🔍 Fund eintragen</div><button class="modal-close" onclick="closeModal('modal-fund')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Gegenstand *</label><input class="form-control" id="f-name" placeholder="z.B. Schlüsselbund"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Emoji</label><input class="form-control" id="f-icon" placeholder="🔑" maxlength="4"></div>
+        <div class="form-group"><label class="form-label">Gefunden am</label><input class="form-control" id="f-date" type="date"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Fundort</label><input class="form-control" id="f-loc" placeholder="z.B. #allgemein"></div>
+      <div class="form-group"><label class="form-label">Beschreibung</label><textarea class="form-control" id="f-desc" rows="2" placeholder="Details..."></textarea></div>
+      <div class="form-group"><label class="form-label">Gemeldet von</label><input class="form-control" id="f-reporter" placeholder="Discord-Name"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-fund')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addFund()">✅ Eintragen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ban -->
+<div class="modal-overlay" id="modal-ban">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">🔨 Ban eintragen</div><button class="modal-close" onclick="closeModal('modal-ban')">✕</button></div>
+    <div class="modal-body">
+      <div class="info-box orange">⚠️ Sorgfältig prüfen, bevor ein Ban eingetragen wird.</div>
+      <div class="form-group"><label class="form-label">Nutzername *</label><input class="form-control" id="b-user" placeholder="Nutzername#0000"></div>
+      <div class="form-group"><label class="form-label">Discord-ID</label><input class="form-control" id="b-id" placeholder="z.B. 123456789012345678"></div>
+      <div class="form-group"><label class="form-label">Grund *</label>
+        <select class="form-control" id="b-reason"><option>Spam/Werbung</option><option>Beleidigung</option><option>Regelverstoß</option><option>Betrug/Scam</option><option>NSFW-Content</option><option>Sonstiges</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Notiz</label><textarea class="form-control" id="b-note" rows="2" placeholder="Details..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Dauer</label>
+          <select class="form-control" id="b-dur"><option>Permanent</option><option>7 Tage</option><option>14 Tage</option><option>30 Tage</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Moderator</label><input class="form-control" id="b-mod" placeholder="Mod-Name"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ban')">Abbrechen</button>
+      <button class="btn btn-danger" onclick="addBan()">🔨 Eintragen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Warn -->
+<div class="modal-overlay" id="modal-warn">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">⚠️ Verwarnung</div><button class="modal-close" onclick="closeModal('modal-warn')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nutzer *</label><input class="form-control" id="w-user" placeholder="Nutzername"></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Grund</label>
+          <select class="form-control" id="w-reason"><option>Regelverstoß</option><option>Spam</option><option>Unhöfliches Verhalten</option><option>Off-Topic</option><option>Sonstiges</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Moderator</label><input class="form-control" id="w-mod" placeholder="Mod-Name"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Notiz</label><textarea class="form-control" id="w-note" rows="2" placeholder="Details..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-warn')">Abbrechen</button>
+      <button class="btn btn-secondary" style="border-color:var(--orange);color:var(--orange);" onclick="addWarn()">⚠️ Verwarnung</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ankündigung -->
+<div class="modal-overlay" id="modal-ann">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">📢 Ankündigung</div><button class="modal-close" onclick="closeModal('modal-ann')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Titel *</label><input class="form-control" id="a-title" placeholder="Überschrift"></div>
+      <div class="form-group"><label class="form-label">Nachricht *</label><textarea class="form-control" id="a-text" rows="4" placeholder="Inhalt..."></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Kategorie</label>
+          <select class="form-control" id="a-cat"><option>📢 Allgemein</option><option>🔧 Update</option><option>🎉 Event</option><option>⚠️ Wichtig</option><option>🔍 Fundbüro</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Von</label><input class="form-control" id="a-author" placeholder="Dein Name"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ann')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addAnn()">📢 Veröffentlichen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ticket -->
+<div class="modal-overlay" id="modal-ticket">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">🎫 Ticket erstellen</div><button class="modal-close" onclick="closeModal('modal-ticket')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Nutzer *</label><input class="form-control" id="tk-user" placeholder="Discord-Name"></div>
+      <div class="form-group"><label class="form-label">Betreff *</label><input class="form-control" id="tk-subject" placeholder="Worum geht es?"></div>
+      <div class="form-group"><label class="form-label">Kategorie</label>
+        <select class="form-control" id="tk-cat"><option>Rolle</option><option>Ban-Appeal</option><option>Support</option><option>Frage</option><option>Sonstiges</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Beschreibung</label><textarea class="form-control" id="tk-desc" rows="3" placeholder="Details..."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-ticket')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addTicket()">🎫 Erstellen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Member -->
+<div class="modal-overlay" id="modal-member">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">👤 Mitglied hinzufügen</div><button class="modal-close" onclick="closeModal('modal-member')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Discord-Name *</label><input class="form-control" id="m-name" placeholder="Nutzername"></div>
+      <div class="form-group"><label class="form-label">Hauptrolle</label>
+        <select class="form-control" id="m-role"><option>Mitglied</option><option>Moderator</option><option>Admin</option><option>VIP</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Farbe (Avatar)</label><input class="form-control" type="color" id="m-color" value="#5865F2" style="height:40px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-member')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="addMember()">✅ Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Schnellaktion -->
+<div class="modal-overlay" id="modal-schnell">
+  <div class="modal">
+    <div class="modal-header"><div class="modal-title">⚡ Schnellaktionen</div><button class="modal-close" onclick="closeModal('modal-schnell')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button class="btn btn-primary" onclick="closeModal('modal-schnell');openModal('modal-termin')">📅 Termin erstellen</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-schnell');openModal('modal-fund')">🔍 Fund eintragen</button>
+        <button class="btn btn-danger" onclick="closeModal('modal-schnell');openModal('modal-ban')">🔨 Ban eintragen</button>
+        <button class="btn btn-secondary" style="border-color:var(--orange);color:var(--orange);" onclick="closeModal('modal-schnell');openModal('modal-warn')">⚠️ Verwarnung</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-schnell');openModal('modal-ann')">📢 Ankündigung</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-schnell');openModal('modal-ticket')">🎫 Ticket</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ FIREBASE + LOGIC ============ -->
+<script type="module">
+// ════════════════════════════════════════════════════════════════
+//  🔥 FIREBASE KONFIGURATION
+//  Ersetze dieses Objekt mit deinen Werten aus der Firebase Console!
+//  Schritt: Firebase Console → Projektübersicht → </> → deine Config
+// ════════════════════════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT_ID",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
+};
+// ════════════════════════════════════════════════════════════════
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import {
+  getFirestore, collection, addDoc, getDocs, deleteDoc, doc,
+  updateDoc, onSnapshot, query, orderBy, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ── STATE ──
+let db = null;
+let isFirebaseReady = false;
+let modName = localStorage.getItem('modName') || 'NecoS';
+
+// Local cache
+let termine = [], funds = [], bans = [], warns = [], members = [], announcements = [], tickets = [], activities = [];
+let calDate = new Date();
+
+// ── INIT FIREBASE ──
+async function initFirebase() {
+  const isDemo = FIREBASE_CONFIG.apiKey === 'DEIN_API_KEY';
+
+  document.getElementById('loading-text').textContent = isDemo
+    ? 'Demo-Modus wird gestartet...'
+    : 'Verbinde mit Firebase...';
+
+  await new Promise(r => setTimeout(r, 800));
+
+  if (!isDemo) {
+    try {
+      const app = initializeApp(FIREBASE_CONFIG);
+      db = getFirestore(app);
+      isFirebaseReady = true;
+      document.getElementById('sync-status').textContent = '🟢 Live-Sync aktiv';
+      document.getElementById('live-dot').style.opacity = '1';
+      document.getElementById('firebase-status-box').textContent = '🟢 Firebase verbunden – Daten werden in Echtzeit synchronisiert';
+      document.getElementById('firebase-status-box').className = 'info-box blue';
+      document.getElementById('setup-banner').style.display = 'none';
+      setupListeners();
+    } catch(e) {
+      showToast('Firebase Fehler: ' + e.message, 'error');
+      startDemoMode();
+    }
+  } else {
+    startDemoMode();
+  }
+
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('setting-modname').value = modName;
+  document.getElementById('b-mod').value = modName;
+  document.getElementById('w-mod').value = modName;
+  document.getElementById('a-author').value = modName;
+  document.getElementById('sidebar-name').textContent = modName;
+  document.getElementById('sidebar-avatar').textContent = modName[0].toUpperCase();
+  document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('f-date').value = new Date().toISOString().split('T')[0];
+  renderCalendar();
+}
+
+function startDemoMode() {
+  showToast('Demo-Modus: Daten werden nicht gespeichert', 'info');
+  // Load demo data
+  termine = [{id:'d1',title:'Server-Meeting',date:'2025-06-10',time:'18:00',type:'meeting',desc:'Monatliches Meeting',org:'NecoS',createdAt:Date.now()}];
+  funds = [{id:'d1',name:'Schlüsselbund',icon:'🔑',date:'2025-05-28',loc:'#allgemein',desc:'Schwarzer Schlüsselbund',reporter:'Pixel_Fox',status:'offen',createdAt:Date.now()}];
+  bans = [{id:'d1',user:'SpamBot#1234',discordId:'111222333',reason:'Spam/Werbung',note:'Wiederholter Spam',duration:'Permanent',mod:'NecoS',date:'2025-04-20',status:'aktiv',createdAt:Date.now()}];
+  warns = [{id:'d1',user:'Rulebreaker_X',reason:'Regelverstoß',mod:'NecoS',note:'Details',date:'2025-04-15',level:2,createdAt:Date.now()}];
+  members = [
+    {id:'d1',name:'NecoS',role:'Admin',color:'#5865F2',roles:['Admin'],createdAt:Date.now()},
+    {id:'d2',name:'Pixel_Fox',role:'Moderator',color:'#43b581',roles:['Moderator'],createdAt:Date.now()},
+  ];
+  activities = [
+    {icon:'🔨',color:'rgba(240,71,71,0.15)',text:'<strong>NecoS</strong> hat <strong>SpamBot#1234</strong> gebannt',time:'Vor 2 Stunden'},
+    {icon:'📅',color:'rgba(88,101,242,0.15)',text:'<strong>NecoS</strong> hat Termin <strong>Server-Meeting</strong> erstellt',time:'Gestern'},
+  ];
+  renderAll();
+}
+
+// ── FIRESTORE LISTENERS (Echtzeit-Sync) ──
+function setupListeners() {
+  const cols = ['termine','funds','bans','warns','members','announcements','tickets','activities'];
+  cols.forEach(col => {
+    onSnapshot(query(collection(db, col), orderBy('createdAt','desc')), snap => {
+      const data = snap.docs.map(d => ({id:d.id,...d.data()}));
+      if(col==='termine') termine=data;
+      else if(col==='funds') funds=data;
+      else if(col==='bans') bans=data;
+      else if(col==='warns') warns=data;
+      else if(col==='members') members=data;
+      else if(col==='announcements') announcements=data;
+      else if(col==='tickets') tickets=data;
+      else if(col==='activities') activities=data;
+      renderAll();
+    });
+  });
+}
+
+// ── DB HELPERS ──
+async function dbAdd(col, data) {
+  if(!isFirebaseReady) return { id: 'local_' + Date.now() };
+  return await addDoc(collection(db, col), { ...data, createdAt: serverTimestamp() });
+}
+async function dbDelete(col, id) {
+  if(!isFirebaseReady) return;
+  await deleteDoc(doc(db, col, id));
+}
+async function dbUpdate(col, id, data) {
+  if(!isFirebaseReady) return;
+  await updateDoc(doc(db, col, id), data);
+}
+async function logActivity(icon, color, text) {
+  const entry = { icon, color, text, time: new Date().toLocaleString('de-DE',{hour:'2-digit',minute:'2-digit'}), createdAt: isFirebaseReady ? serverTimestamp() : Date.now() };
+  if(!isFirebaseReady) { activities.unshift(entry); renderDashboard(); return; }
+  await dbAdd('activities', entry);
+}
+
+// ── RENDER ALL ──
+function renderAll() {
+  renderDashboard(); renderTermine(); renderFund(); renderBans();
+  renderWarns(); renderMembers(); renderAnn(); renderTickets(); renderCalendar();
+  updateBadges();
+}
+
+function updateBadges() {
+  document.getElementById('badge-termine').textContent = termine.length;
+  document.getElementById('badge-fund').textContent = funds.filter(f=>f.status==='offen').length;
+  document.getElementById('badge-bans').textContent = bans.filter(b=>b.status==='aktiv').length;
+  const openTickets = tickets.filter(t=>t.status==='offen').length;
+  document.getElementById('badge-tickets').textContent = openTickets;
+  document.getElementById('ticket-count').textContent = openTickets;
+}
+
+// ── HELPERS ──
+window.showPage = function(id, navEl) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const page = document.getElementById('page-'+id);
+  if(page) page.classList.add('active');
+  if(navEl) navEl.classList.add('active');
+  const titles = {dashboard:'🏠 Dashboard',termine:'📅 Terminverwaltung',fundbüro:'🔍 Fundbüro',bans:'🔨 Bans & Sperren',verwarnungen:'⚠️ Verwarnungen',mitglieder:'👥 Mitglieder',ankuendigungen:'📢 Ankündigungen',tickets:'🎫 Tickets',einstellungen:'⚙️ Einstellungen'};
+  document.getElementById('topbar-title').textContent = titles[id]||'';
+};
+window.openModal = id => document.getElementById(id).classList.add('open');
+window.closeModal = id => document.getElementById(id).classList.remove('open');
+document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('open')}));
+window.switchTab = function(id, el) {
+  el.closest('.tabs').querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  el.closest('.page').querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+};
+
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  const el = document.createElement('div');
+  el.className = `toast-item ${type}`;
+  el.innerHTML = `${type==='success'?'✅':type==='error'?'❌':'ℹ️'} ${msg}`;
+  t.appendChild(el);
+  setTimeout(()=>el.remove(), 3500);
+}
+window.showToast = showToast;
+
+function typeTag(type) {
+  const m={event:'tag-green',meeting:'tag-blue',wartung:'tag-orange',sonstiges:'tag-blue'};
+  const l={event:'🎉 Event',meeting:'💬 Meeting',wartung:'🔧 Wartung',sonstiges:'📌 Sonstiges'};
+  return `<span class="tag ${m[type]||'tag-blue'}">${l[type]||type}</span>`;
+}
+function statusTag(s) {
+  const m={offen:'tag-orange',gefunden:'tag-blue',abgeholt:'tag-green',aktiv:'tag-red',abgelaufen:'tag-green'};
+  const l={offen:'⏳ Offen',gefunden:'🔍 Gefunden',abgeholt:'✅ Abgeholt',aktiv:'🔨 Aktiv',abgelaufen:'✔️ Abgelaufen'};
+  return `<span class="tag ${m[s]||'tag-blue'}">${l[s]||s}</span>`;
+}
+function warnBar(level) {
+  let h='<div class="warn-bar">';
+  for(let i=1;i<=5;i++) h+=`<div class="warn-dot ${i<=level?(level>=4?'red':'active'):''}"></div>`;
+  return h+'</div>';
+}
+function fmtDate(d) {
+  if(!d) return '—';
+  // Firestore Timestamp
+  if(d && d.toDate) d = d.toDate().toISOString().split('T')[0];
+  return new Date(d).toLocaleDateString('de-DE',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+// ── RENDER FUNCTIONS ──
+function renderDashboard() {
+  document.getElementById('stat-members').textContent = members.length;
+  document.getElementById('stat-termine').textContent = termine.length;
+  document.getElementById('stat-bans').textContent = bans.filter(b=>b.status==='aktiv').length;
+  document.getElementById('stat-fund').textContent = funds.filter(f=>f.status==='offen').length;
+
+  const dl = document.getElementById('dash-termine');
+  const upcoming = [...termine].slice(0,3);
+  dl.innerHTML = upcoming.length ? upcoming.map(t => {
+    const d = new Date(t.date);
+    return `<div class="event-item">
+      <div class="event-date-box"><div class="day">${d.getDate()}</div><div class="month">${d.toLocaleDateString('de-DE',{month:'short'})}</div></div>
+      <div class="event-info"><div class="event-title">${t.title}</div><div class="event-meta"><span>⏰ ${t.time||'—'}</span>${typeTag(t.type)}</div></div>
+    </div>`;
+  }).join('') : '<div class="empty-state"><div class="icon">📅</div><p>Keine Termine</p></div>';
+
+  document.getElementById('dash-activity').innerHTML = activities.slice(0,5).map(a =>
+    `<div class="activity-item"><div class="activity-icon" style="background:${a.color}">${a.icon}</div>
+    <div><div class="activity-text">${a.text}</div><div class="activity-time">${a.time||''}</div></div></div>`
+  ).join('') || '<div class="empty-state"><p>Keine Aktivitäten</p></div>';
+
+  const openTickets = tickets.filter(t=>t.status==='offen');
+  document.getElementById('dash-tickets').innerHTML = openTickets.length
+    ? openTickets.slice(0,3).map(t=>`<div class="event-item" style="background:var(--surface2);">
+        <div style="font-size:22px;">🎫</div>
+        <div class="event-info"><div class="event-title">${t.user} – ${t.subject}</div>
+        <div class="event-meta"><span class="tag tag-orange">Offen</span> <span>${fmtDate(t.date)}</span></div></div>
+      </div>`).join('')
+    : '<div class="empty-state"><p>Keine offenen Tickets</p></div>';
+
+  document.getElementById('dash-fund').innerHTML = funds.filter(f=>f.status==='offen').slice(0,4).map(f =>
+    `<div class="activity-item"><div class="activity-icon" style="background:rgba(255,215,0,0.1);font-size:18px;">${f.icon||'📦'}</div>
+    <div><div class="activity-text"><strong>${f.name}</strong> – ${f.loc||'—'}</div>
+    <div class="activity-time">von ${f.reporter} · ${fmtDate(f.date)}</div></div></div>`
+  ).join('') || '<div class="empty-state"><p>Keine offenen Funde</p></div>';
+}
+
+function renderTermine() {
+  const el = document.getElementById('termine-list');
+  if(!termine.length){el.innerHTML='<div class="empty-state"><div class="icon">📅</div><p>Keine Termine</p></div>';return;}
+  el.innerHTML = [...termine].sort((a,b)=>a.date?.localeCompare(b.date)).map(t=>`
+    <div class="event-item">
+      <div class="event-date-box"><div class="day">${new Date(t.date).getDate()}</div><div class="month">${new Date(t.date).toLocaleDateString('de-DE',{month:'short'})}</div></div>
+      <div class="event-info"><div class="event-title">${t.title}</div>
+        <div class="event-meta"><span>⏰ ${t.time}</span><span>👤 ${t.org||'—'}</span>${typeTag(t.type)}</div>
+        ${t.desc?`<div style="font-size:12px;color:var(--text3);margin-top:4px;">${t.desc}</div>`:''}
+      </div>
+      <div class="event-actions"><button class="btn btn-danger btn-sm" onclick="delTermin('${t.id}')">🗑</button></div>
+    </div>`).join('');
+}
+
+let fundFilter = '', fundStatusFilter = '';
+function renderFund(list) {
+  list = list || funds.filter(f=>
+    (!fundFilter || f.name?.toLowerCase().includes(fundFilter)) &&
+    (!fundStatusFilter || f.status===fundStatusFilter)
+  );
+  const el = document.getElementById('fund-grid');
+  if(!list.length){el.innerHTML='<div class="empty-state" style="grid-column:1/-1"><div class="icon">🔍</div><p>Keine Einträge</p></div>';return;}
+  el.innerHTML = list.map(f=>`
+    <div class="lost-card">
+      <div class="item-icon">${f.icon||'📦'}</div>
+      <div class="item-name">${f.name}</div>
+      <div class="item-meta">📍 ${f.loc||'—'}<br>👤 ${f.reporter} · ${fmtDate(f.date)}</div>
+      ${f.desc?`<div style="font-size:11px;color:var(--text3);margin-top:6px;">${f.desc}</div>`:''}
+      <div class="item-status">${statusTag(f.status)}</div>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        ${f.status==='offen'?`<button class="btn btn-success btn-sm" onclick="setFundStatus('${f.id}','gefunden')">✅ Gefunden</button>`:''}
+        ${f.status==='gefunden'?`<button class="btn btn-success btn-sm" onclick="setFundStatus('${f.id}','abgeholt')">📦 Abgeholt</button>`:''}
+        <button class="btn btn-danger btn-sm" onclick="delFund('${f.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderBans(list) {
+  list = list || bans;
+  const body = document.getElementById('ban-body');
+  if(!list.length){body.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px;">Keine Bans</td></tr>';return;}
+  body.innerHTML = list.map(b=>`<tr>
+    <td><strong>${b.user}</strong><br><span style="font-size:11px;color:var(--text3);">${b.discordId||'—'}</span></td>
+    <td>${b.mod}</td>
+    <td>${b.reason}${b.note?`<br><span style="font-size:11px;color:var(--text3);">${b.note}</span>`:''}</td>
+    <td>${fmtDate(b.date)}</td>
+    <td><span class="tag tag-orange">${b.duration}</span></td>
+    <td>${statusTag(b.status)}</td>
+    <td style="display:flex;gap:6px;">
+      <button class="btn btn-success btn-sm" onclick="unban('${b.id}')" ${b.status==='abgelaufen'?'disabled':''}>✔️ Entfernen</button>
+      <button class="btn btn-danger btn-sm" onclick="delBan('${b.id}')">🗑</button>
+    </td>
+  </tr>`).join('');
+}
+
+function renderWarns() {
+  const body = document.getElementById('warn-body');
+  if(!warns.length){body.innerHTML='<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">Keine Verwarnungen</td></tr>';return;}
+  body.innerHTML = warns.map(w=>`<tr>
+    <td><strong>${w.user}</strong></td><td>${w.mod}</td>
+    <td>${w.reason}${w.note?`<br><span style="font-size:11px;color:var(--text3);">${w.note}</span>`:''}</td>
+    <td>${warnBar(w.level)}</td><td>${fmtDate(w.date)}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="delWarn('${w.id}')">🗑</button></td>
+  </tr>`).join('');
+}
+
+let membersCache = [];
+function renderMembers(list) {
+  list = list || members;
+  membersCache = list;
+  const el = document.getElementById('member-list');
+  if(!list.length){el.innerHTML='<div class="empty-state"><div class="icon">👥</div><p>Keine Mitglieder</p></div>';return;}
+  el.innerHTML = list.map(m=>`
+    <div class="member-item">
+      <div class="member-avatar" style="background:${m.color||'#5865F2'}">${(m.name||'?')[0].toUpperCase()}</div>
+      <div class="member-info">
+        <div class="member-name">${m.name}</div>
+        <div class="member-roles">${(m.roles||[m.role]).map(r=>`<span class="tag tag-blue" style="font-size:10px;padding:1px 7px;">${r}</span>`).join(' ')}</div>
+      </div>
+      <div class="member-actions">
+        <button class="btn btn-secondary btn-sm" style="border-color:var(--orange);color:var(--orange);" onclick="openModal('modal-warn');document.getElementById('w-user').value='${m.name}'">⚠️</button>
+        <button class="btn btn-danger btn-sm" onclick="openModal('modal-ban');document.getElementById('b-user').value='${m.name}'">🔨</button>
+        <button class="btn btn-danger btn-sm" onclick="delMember('${m.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderAnn() {
+  const el = document.getElementById('ann-list');
+  if(!announcements.length){el.innerHTML='<div class="empty-state"><div class="icon">📢</div><p>Keine Ankündigungen</p></div>';return;}
+  el.innerHTML = [...announcements].map(a=>`
+    <div class="announcement">
+      <div class="ann-title">${a.cat} ${a.title}</div>
+      <div class="ann-text">${a.text}</div>
+      <div class="ann-meta">📝 ${a.author} · ${fmtDate(a.date||a.createdAt)}
+        <button class="btn btn-danger btn-sm" style="margin-left:12px;" onclick="delAnn('${a.id}')">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderTickets() {
+  const openBody = document.getElementById('ticket-body-offen');
+  const closedBody = document.getElementById('ticket-body-closed');
+  const open = tickets.filter(t=>t.status==='offen');
+  const closed = tickets.filter(t=>t.status==='geschlossen');
+  document.getElementById('tab-offen-count').textContent = open.length;
+
+  openBody.innerHTML = open.length ? open.map(t=>`<tr>
+    <td><span class="tag tag-blue">#${(t.num||'?').toString().padStart(3,'0')}</span></td>
+    <td><strong>${t.user}</strong></td><td>${t.subject}</td>
+    <td><span class="tag tag-orange">${t.cat}</span></td>
+    <td>${fmtDate(t.date)}</td>
+    <td style="display:flex;gap:6px;">
+      <button class="btn btn-success btn-sm" onclick="closeTicket('${t.id}')">✅ Schließen</button>
+      <button class="btn btn-danger btn-sm" onclick="delTicket('${t.id}')">🗑</button>
+    </td>
+  </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:24px;">Keine offenen Tickets</td></tr>';
+
+  closedBody.innerHTML = closed.length ? closed.map(t=>`<tr>
+    <td><span class="tag tag-green">#${(t.num||'?').toString().padStart(3,'0')}</span></td>
+    <td>${t.user}</td><td>${t.subject}</td><td>${fmtDate(t.closedAt||t.date)}</td>
+  </tr>`).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:20px;">Keine geschlossenen Tickets</td></tr>';
+}
+
+function renderCalendar() {
+  const el = document.getElementById('calendar');
+  if(!el) return;
+  const year = calDate.getFullYear(), month = calDate.getMonth();
+  const monthNames=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+  const first = new Date(year,month,1).getDay();
+  const start = first===0?6:first-1;
+  const days = new Date(year,month+1,0).getDate();
+  const today = new Date();
+  const eventDays = new Set(termine.filter(t=>{const d=new Date(t.date);return d.getFullYear()===year&&d.getMonth()===month;}).map(t=>parseInt(t.date?.split('-')[2])));
+  let html=`<div class="cal-header"><button onclick="calPrev()">◀</button><span>${monthNames[month]} ${year}</span><button onclick="calNext()">▶</button></div><div class="cal-grid">`;
+  ['Mo','Di','Mi','Do','Fr','Sa','So'].forEach(d=>html+=`<div class="cal-dayname">${d}</div>`);
+  for(let i=0;i<start;i++) html+='<div class="cal-day empty"></div>';
+  for(let d=1;d<=days;d++){
+    const isToday=today.getDate()===d&&today.getMonth()===month&&today.getFullYear()===year;
+    const hasEvent=eventDays.has(d);
+    html+=`<div class="cal-day ${isToday?'today':''} ${hasEvent?'has-event':''}">${d}</div>`;
+  }
+  html+='</div>';
+  el.innerHTML=html;
+}
+window.calPrev=()=>{calDate.setMonth(calDate.getMonth()-1);renderCalendar();}
+window.calNext=()=>{calDate.setMonth(calDate.getMonth()+1);renderCalendar();}
+
+// ── ACTIONS ──
+window.addTermin = async function() {
+  const title=document.getElementById('t-title').value.trim();
+  const date=document.getElementById('t-date').value;
+  if(!title||!date){showToast('Bitte Titel und Datum ausfüllen!','error');return;}
+  const data={title,date,time:document.getElementById('t-time').value,type:document.getElementById('t-type').value,desc:document.getElementById('t-desc').value,org:document.getElementById('t-org').value||modName,createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){termine.unshift({id:'local_'+Date.now(),...data});}
+  else await dbAdd('termine',data);
+  await logActivity('📅','rgba(88,101,242,0.15)',`<strong>${modName}</strong> hat Termin <strong>${title}</strong> erstellt`);
+  closeModal('modal-termin');
+  ['t-title','t-desc','t-org'].forEach(i=>document.getElementById(i).value='');
+  if(!isFirebaseReady) renderAll();
+  showToast('Termin erstellt!','success');
+};
+
+window.delTermin = async function(id) {
+  if(!confirm('Termin wirklich löschen?')) return;
+  if(!isFirebaseReady){termine=termine.filter(t=>t.id!==id);renderAll();return;}
+  await dbDelete('termine',id);
+  showToast('Termin gelöscht','info');
+};
+
+window.addFund = async function() {
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){showToast('Bitte Gegenstand angeben!','error');return;}
+  const data={name,icon:document.getElementById('f-icon').value||'📦',date:document.getElementById('f-date').value,loc:document.getElementById('f-loc').value,desc:document.getElementById('f-desc').value,reporter:document.getElementById('f-reporter').value||'Unbekannt',status:'offen',createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){funds.unshift({id:'local_'+Date.now(),...data});}
+  else await dbAdd('funds',data);
+  await logActivity('🔍','rgba(255,215,0,0.1)',`<strong>${modName}</strong> hat Fund eingetragen: <strong>${name}</strong>`);
+  closeModal('modal-fund');
+  ['f-name','f-icon','f-loc','f-desc','f-reporter'].forEach(i=>document.getElementById(i).value='');
+  if(!isFirebaseReady) renderAll();
+  showToast('Fund eingetragen!','success');
+};
+
+window.delFund = async function(id) {
+  if(!isFirebaseReady){funds=funds.filter(f=>f.id!==id);renderAll();return;}
+  await dbDelete('funds',id); showToast('Eintrag gelöscht','info');
+};
+
+window.setFundStatus = async function(id,status) {
+  if(!isFirebaseReady){const f=funds.find(f=>f.id===id);if(f)f.status=status;renderAll();return;}
+  await dbUpdate('funds',id,{status}); showToast('Status aktualisiert','success');
+};
+
+window.filterFund = q => { fundFilter=q.toLowerCase(); renderFund(); };
+window.filterFundStatus = s => { fundStatusFilter=s; renderFund(); };
+window.filterBans = q => renderBans(bans.filter(b=>b.user?.toLowerCase().includes(q.toLowerCase())));
+window.filterMembers = q => renderMembers(members.filter(m=>m.name?.toLowerCase().includes(q.toLowerCase())));
+
+window.addBan = async function() {
+  const user=document.getElementById('b-user').value.trim();
+  if(!user){showToast('Bitte Nutzername angeben!','error');return;}
+  const data={user,discordId:document.getElementById('b-id').value||'—',reason:document.getElementById('b-reason').value,note:document.getElementById('b-note').value,duration:document.getElementById('b-dur').value,mod:document.getElementById('b-mod').value||modName,date:new Date().toISOString().split('T')[0],status:'aktiv',createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){bans.unshift({id:'local_'+Date.now(),...data});}
+  else await dbAdd('bans',data);
+  await logActivity('🔨','rgba(240,71,71,0.15)',`<strong>${modName}</strong> hat <strong>${user}</strong> gebannt`);
+  closeModal('modal-ban');
+  ['b-user','b-id','b-note'].forEach(i=>document.getElementById(i).value='');
+  if(!isFirebaseReady) renderAll();
+  showToast(`${user} wurde gebannt!`, 'success');
+};
+
+window.unban = async function(id) {
+  if(!isFirebaseReady){const b=bans.find(b=>b.id===id);if(b)b.status='abgelaufen';renderAll();return;}
+  await dbUpdate('bans',id,{status:'abgelaufen'}); showToast('Ban aufgehoben','success');
+};
+
+window.delBan = async function(id) {
+  if(!isFirebaseReady){bans=bans.filter(b=>b.id!==id);renderAll();return;}
+  await dbDelete('bans',id); showToast('Ban gelöscht','info');
+};
+
+window.addWarn = async function() {
+  const user=document.getElementById('w-user').value.trim();
+  if(!user){showToast('Bitte Nutzername angeben!','error');return;}
+  const existing=warns.filter(w=>w.user===user);
+  const data={user,reason:document.getElementById('w-reason').value,mod:document.getElementById('w-mod').value||modName,note:document.getElementById('w-note').value,date:new Date().toISOString().split('T')[0],level:Math.min(5,existing.length+1),createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){warns.unshift({id:'local_'+Date.now(),...data});}
+  else await dbAdd('warns',data);
+  await logActivity('⚠️','rgba(250,166,26,0.12)',`<strong>${modName}</strong> hat <strong>${user}</strong> verwarnt (Level ${data.level})`);
+  closeModal('modal-warn');
+  ['w-user','w-note'].forEach(i=>document.getElementById(i).value='');
+  if(!isFirebaseReady) renderAll();
+  showToast('Verwarnung erteilt!','success');
+};
+
+window.delWarn = async function(id) {
+  if(!isFirebaseReady){warns=warns.filter(w=>w.id!==id);renderAll();return;}
+  await dbDelete('warns',id); showToast('Verwarnung gelöscht','info');
+};
+
+window.addAnn = async function() {
+  const title=document.getElementById('a-title').value.trim();
+  const text=document.getElementById('a-text').value.trim();
+  if(!title||!text){showToast('Bitte Titel und Text ausfüllen!','error');return;}
+  const data={title,text,cat:document.getElementById('a-cat').value,author:document.getElementById('a-author').value||modName,date:new Date().toISOString().split('T')[0],createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){announcements.unshift({id:'local_'+Date.now(),...data});}
+  else await dbAdd('announcements',data);
+  closeModal('modal-ann');
+  ['a-title','a-text'].forEach(i=>document.getElementById(i).value='');
+  if(!isFirebaseReady) renderAll();
+  showToast('Ankündigung veröffentlicht!','success');
+};
+
+window.delAnn = async function(id) {
+  if(!isFirebaseReady){announcements=announcements.filter(a=>a.id!==id);renderAll();return;}
+  await dbDelete('announcements',id); showToast('Ankündigung gelöscht','info');
+};
+
+window.addTicket = async function() {
+  const user=document.getElementById('tk-user').value.trim();
+  const subject=document.getElementById('tk-subject').value.trim();
+  if(!user||!subject){showToast('Bitte Nutzer und Betreff ausfüllen!','error');return;}
+  const num = tickets.length+1;
+  const data={user,subject,cat:document.getElementById('tk-cat').value,desc:document.getElementById('tk-desc').value,date:new Date().toISOString().split('T')[0],status:'offen',num,createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){tickets.unshift({id:'local_'+Date.now(),...data});}
+  else await dbAdd('tickets',data);
+  await logActivity('🎫','rgba(67,181,129,0.12)',`<strong>${user}</strong> hat Ticket <strong>#${num.toString().padStart(3,'0')}</strong> erstellt`);
+  closeModal('modal-ticket');
+  ['tk-user','tk-subject','tk-desc'].forEach(i=>document.getElementById(i).value='');
+  if(!isFirebaseReady) renderAll();
+  showToast('Ticket erstellt!','success');
+};
+
+window.closeTicket = async function(id) {
+  if(!isFirebaseReady){const t=tickets.find(t=>t.id===id);if(t){t.status='geschlossen';t.closedAt=new Date().toISOString().split('T')[0];}renderAll();return;}
+  await dbUpdate('tickets',id,{status:'geschlossen',closedAt:serverTimestamp()});
+  showToast('Ticket geschlossen','success');
+};
+
+window.delTicket = async function(id) {
+  if(!isFirebaseReady){tickets=tickets.filter(t=>t.id!==id);renderAll();return;}
+  await dbDelete('tickets',id); showToast('Ticket gelöscht','info');
+};
+
+window.addMember = async function() {
+  const name=document.getElementById('m-name').value.trim();
+  if(!name){showToast('Bitte Namen angeben!','error');return;}
+  const role=document.getElementById('m-role').value;
+  const data={name,role,roles:[role],color:document.getElementById('m-color').value,createdAt:isFirebaseReady?null:Date.now()};
+  if(!isFirebaseReady){members.push({id:'local_'+Date.now(),...data});}
+  else await dbAdd('members',data);
+  closeModal('modal-member');
+  document.getElementById('m-name').value='';
+  if(!isFirebaseReady) renderAll();
+  showToast('Mitglied hinzugefügt!','success');
+};
+
+window.delMember = async function(id) {
+  if(!confirm('Mitglied wirklich entfernen?')) return;
+  if(!isFirebaseReady){members=members.filter(m=>m.id!==id);renderAll();return;}
+  await dbDelete('members',id); showToast('Mitglied entfernt','info');
+};
+
+window.saveSetting = function() {
+  modName = document.getElementById('setting-modname').value || 'NecoS';
+  localStorage.setItem('modName', modName);
+  document.getElementById('sidebar-name').textContent = modName;
+  document.getElementById('sidebar-avatar').textContent = modName[0].toUpperCase();
+  document.getElementById('b-mod').value = modName;
+  document.getElementById('w-mod').value = modName;
+  document.getElementById('a-author').value = modName;
+  showToast('Einstellungen gespeichert!','success');
+};
+
+window.exportData = function() {
+  const data={termine,funds,bans,warns,members,announcements,tickets,activities,exportedAt:new Date().toISOString()};
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=`necos-dashboard-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  showToast('Export gestartet!','success');
+};
+
+// ── START ──
+initFirebase();
+</script>
+</body>
+</html>
